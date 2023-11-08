@@ -75,7 +75,6 @@ class RedisAdapter extends KVAdapter {
       if (e.errors) {
         e = e.errors[0];
       }
-      console.error(e);
       throw new Error(`Could not connect to Redis: ${e.message}`);
     }
     this.log(`Successfully connected to ${this.name}${this._config.database ? ` database "${this._config.database}"` : ``}!`);

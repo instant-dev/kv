@@ -61,8 +61,9 @@ class InstantKV {
       this.constructor.getAdapter(cfg.adapter) ||
       this.constructor.getDefaultAdapter()
     );
-    this._stores[name] = new Adapter(this, cfg);
-    await this._stores[name].connect();
+    const store = new Adapter(this, cfg);
+    await store.connect();
+    this._stores[name] = store;
     return true;
   }
 

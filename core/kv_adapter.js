@@ -140,7 +140,7 @@ class KVAdapter {
     if (match) {
       cfg.user = match[1] || cfg.user || defaultConfig.user;
       cfg.password = match[2] || cfg.password || defaultConfig.password;
-      cfg.host = match[3] | cfg.host || defaultConfig.host;
+      cfg.host = match[3] || cfg.host || defaultConfig.host;
       cfg.port = match[4] || cfg.port || defaultConfig.port;
       cfg.database = match[5] || cfg.database || defaultConfig.database;
     }

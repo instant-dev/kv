@@ -23,8 +23,23 @@ class KVConfigManager {
   }
 
   __check__ () {
-    if (!fs.existsSync(this.constructor.rootDirectory)) {
-      SchemaManager.checkdir(this.constructor.rootDirectory);
+    const pathname = this.constructor.rootDirectory;
+    if (!fs.existsSync(pathname)) {
+      let cwd = process.cwd();
+      if (!fs.existsSync(pathname)) {
+        let paths = pathname.split('/');
+        for (let i = 0; i < paths.length; i++) {
+          let dirpath = path.join(cwd, ...paths.slice(0, i + 1));
+          if (!fs.existsSync(dirpath)) {
+            try {
+              fs.mkdirSync(dirpath);
+            } catch (e) {
+              console.error(e);
+              throw new Error(`Could not write directory "${dirpath}": ${e.message}`);
+            }
+          }
+        }
+      }
     }
   }
 

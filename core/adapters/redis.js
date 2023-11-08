@@ -50,7 +50,7 @@ class RedisAdapter extends KVAdapter {
       this._tunnel = result.tunnelObject;
     }
     this.log(`Connecting to ${this.name}${this._config.database ? ` database "${this._config.database}"` : ``} as role "${this._config.user}" on ${this._config.host}:${this._config.port} ...`);
-    const url = `redis://${this._config.user}:${this._config.password}@${this._config.host}:${this._config.port}/${this._config.database}`;
+    const url = `redis${this._config.ssl ? 's' : ''}://${this._config.user}:${this._config.password}@${this._config.host}:${this._config.port}/${this._config.database}`;
     this._client = createClient({
       url,
       retryStrategy: (times) => {

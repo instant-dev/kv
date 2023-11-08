@@ -16,7 +16,9 @@ export default async function (setupResult) {
 
   it ('Makes sure no _instant/kv.json exists', async function () {
 
-    fs.unlinkSync('./_instant/kv.json');
+    if (fs.existsSync('./_instant/kv.json')) {
+      fs.unlinkSync('./_instant/kv.json');
+    }
     expect(fs.existsSync('./_instant/kv.json')).to.equal(false);
 
   });

@@ -1,20 +1,19 @@
 const colors = require('colors/safe');
-const { createClient } = require('redis');
-const { commandOptions } = require('redis');
-
+const { createClient, commandOptions } = require('redis');
 
 const KVAdapter = require('../kv_adapter.js');
+
+const DEFAULT_CONNECT_TIMEOUT = 5000;
 const DEFAULT_COMMAND_TIMEOUT = 5000;
 
 class RedisAdapter extends KVAdapter {
 
   name = 'redis';
 
-  constructor (kv, cfg) {
+  constructor (cfg) {
     super();
     cfg = this.parseConfig(cfg);
     this.COMMAND_TIMEOUT = DEFAULT_COMMAND_TIMEOUT;
-    this.kv = kv;
     this._config = cfg;
     this._tunnel = null;
     this._client = null;
@@ -42,7 +41,7 @@ class RedisAdapter extends KVAdapter {
     this.log('Closed');
   }
 
-  async connect () {
+  async connect (connectTimeout) {
     let cfg = this._config;
     if (cfg.tunnel) {
       let result = await this.connectToTunnel(cfg);
@@ -53,11 +52,14 @@ class RedisAdapter extends KVAdapter {
     const url = `redis${this._config.ssl ? 's' : ''}://${this._config.user}:${this._config.password}@${this._config.host}:${this._config.port}/${this._config.database}`;
     this._client = createClient({
       url,
-      retryStrategy: (times) => {
-        const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-        const delay = Math.min(times * 1000, maxDelay);
-        this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-        return delay;
+      socket: {
+        connectTimeout: connectTimeout || DEFAULT_CONNECT_TIMEOUT,
+        reconnectStrategy: (times) => {
+          const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+          const delay = Math.min(times * 1000, maxDelay);
+          this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+          return delay;
+        }
       }
     });
     try {

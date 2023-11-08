@@ -7,7 +7,9 @@ class InstantKV {
     'redis': require('./adapters/redis.js')
   };
 
-  constructor () {
+  constructor (opts) {
+    opts = opts || {};
+    this.connectTimeout = opts.connectTimeout || null;
     this.Config = new KVConfigManager();
     this.__initialize__();
   }
@@ -61,8 +63,8 @@ class InstantKV {
       this.constructor.getAdapter(cfg.adapter) ||
       this.constructor.getDefaultAdapter()
     );
-    const store = new Adapter(this, cfg);
-    await store.connect();
+    const store = new Adapter(cfg);
+    await store.connect(this.connectTimeout);
     this._stores[name] = store;
     return true;
   }

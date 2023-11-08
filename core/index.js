@@ -1,9 +1,20 @@
+const KVConfigManager = require('./kv_config_manager.js');
+
 class InstantKV {
 
   static defaultAdapter = 'redis';
   static availableAdapters = {
     'redis': require('./adapters/redis.js')
   };
+
+  constructor () {
+    this.Config = new KVConfigManager();
+    this.__initialize__();
+  }
+
+  __initialize__ () {
+    this._stores = {'main': null};
+  }
 
   /**
    * Retrieves an Adapter
@@ -23,11 +34,24 @@ class InstantKV {
   }
 
   /**
-   * Connects to a KV store
+   * Connects to your main KV store
    * @param {cfg} cfg 
    * @returns {Promise<boolean>}
    */
   async connect (cfg) {
+    return this.addStore('main', cfg);
+  }
+
+  /**
+   * Connects to a KV store
+   * @param {string} name
+   * @param {cfg} cfg 
+   * @returns {Promise<boolean>}
+   */
+  async addStore (name, cfg) {
+    if (this._stores[name]) {
+      throw new Error(`Already connected to store "${name}", use ".addStore()" to connect to another`);
+    }
     if (typeof cfg === 'string') {
       cfg = {connectionString: cfg};
     }
@@ -35,110 +59,46 @@ class InstantKV {
       this.constructor.getAdapter(cfg.adapter) ||
       this.constructor.getDefaultAdapter()
     );
-    this.adapter = new Adapter(this, cfg);
-    await this.adapter.connect();
+    this._stores[name] = new Adapter(this, cfg);
+    await this._stores[name].connect();
     return true;
   }
 
   /**
-   * Closes connection to KV store
+   * Closes a KV store immediately
+   * @param {string} name
+   * @returns {Promise<boolean>}
    */
-  async close () {
-    await this.adapter.close();
+  async closeStore (name) {
+    await this.store(name).close();
   }
 
   /**
-   * Sets a key with any acceptable JSON value; setting null will clear the key
-   * @param {string} key The key to set
-   * @param {any} value The value to set
-   * @returns {any}
+   * Disconnects from all stores
+   * @returns {boolean}
    */
-  async set (key, value = null) {
-    if (value === null) {
-      await this.clear(key);
-      return value;
-    } else {
-      return this.adapter.setJSON(key, value);
+  async disconnect () {
+    let names = Object.keys(this._stores)
+      .filter(name => name !== 'main' && this._stores[name]);
+    for (const name of names) {
+      const store = this._stores[name];
+      await this.closeStore(name);
     }
-  }
-
-  /**
-   * Gets a key with any acceptable JSON value; optionall returns a defaultValue if not set
-   * @param {string} key The key to set
-   * @param {any} defaultValue If no value is returned, get the default
-   * @returns {any}
-   */
-  async get (key, defaultValue = null) {
-    return this.adapter.getJSON(key, defaultValue);
-  }
-
-  /**
-   * Clears a key from the store
-   * @param {string|array<string>} key The key or keys to clear
-   * @returns {any}
-   */
-  async clear (key) {
-    await this.adapter.clear(key);
+    this._stores['main'] && this.closeStore('main');
+    this.__initialize__();
     return true;
   }
 
   /**
-   * Sets a key with a string value; slightly faster than .set()
-   * @param {string} key The key to set
-   * @param {string} value The value to set
-   * @returns {any}
+   * Retrieves a kv store you have connected to
+   * @param {string} name 
+   * @returns {import('./kv_adapter.js')}
    */
-  async setRaw (key, value = null) {
-    if (value === null) {
-      await this.clear(key);
-      return null;
-    } else {
-      return this.adapter.set(key, value);
+  store (name = 'main') {
+    if (!this._stores[name]) {
+      throw new Error(`Store "${name}" is not connected`);
     }
-  }
-
-  /**
-   * Gets the raw value of a key; slightly faster than .get()
-   * @param {string} key The key to set
-   * @param {string} defaultValue If no value is returned, get the default
-   * @returns {any}
-   */
-  async getRaw (key, defaultValue = null) {
-    return this.adapter.get(key, defaultValue);
-  }
-
-  /**
-   * Sets a key with a Buffer value
-   * @param {string} key The key to set
-   * @param {buffer} value The value to set
-   * @returns {any}
-   */
-  async setBuffer (key, value = null) {
-    if (value === null) {
-      await this.clear(key);
-      return null;
-    } else {
-      return this.adapter.setBuffer(key, value);
-    }
-  }
-
-  /**
-   * Gets the Buffer value of a key
-   * @param {string} key The key to set
-   * @param {buffer} defaultValue If no value is returned, get the default
-   * @returns {any}
-   */
-  async getBuffer (key, defaultValue = null) {
-    return this.adapter.getBuffer(key, defaultValue);
-  }
-
-  /**
-   * Executes an arbitrary command against the KV client
-   * @param {any} args any set of strings
-   * @returns {any}
-   */
-  async command (...args) {
-    return this.adapter.command(...args);
+    return this._stores[name];
   }
 
 }

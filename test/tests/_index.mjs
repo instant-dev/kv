@@ -1,7 +1,9 @@
 import chai from 'chai';
 const expect = chai.expect;
 
-import fs from 'fs';
+import dotenv from 'dotenv';
+
+dotenv.config({path: '.env.test'});
 
 import InstantKV from '../../core/index.js';
 
@@ -11,74 +13,106 @@ export default async function (setupResult) {
   const cfg = {connectionString: 'redis://localhost:6379'};
   const kv = new InstantKV();
 
+  it ('Writes and reads config to _instant/kv.json', async function () {
+
+    let cfg = kv.Config.write('test', 'main', {connectionString: '{{ REDIS_URL }}'});
+
+    expect(cfg).to.exist;
+    expect(cfg.connectionString).to.equal('{{ REDIS_URL }}');
+
+    let readCfg = kv.Config.read('test', 'main');
+
+    expect(readCfg).to.exist;
+    expect(readCfg.connectionString).to.equal(process.env.REDIS_URL);
+
+  });
+
+  it ('Writes more config to _instant/kv.json', async function () {
+
+    const host = `host-${new Date().valueOf()}`;
+    let cfg = kv.Config.write('development', 'main', {host, port: 1111});
+
+    expect(cfg).to.exist;
+    expect(cfg.host).to.equal(host);
+
+    let readCfg = kv.Config.read('development', 'main');
+
+    expect(readCfg).to.exist;
+    expect(readCfg.host).to.equal(host);
+
+  });
+
   it ('See if kv will connect', async function () {
 
     await kv.connect(cfg);
     expect(kv).to.exist;
+    expect(kv.store()).to.exist;
+    expect(kv.store('main')).to.exist;
+    expect(kv.store('main')).to.equal(kv.store());
 
   });
 
   it ('Will set a value', async function () {
 
-    let result = await kv.set('test', 'a');
+    let result = await kv.store().set('test', 'a');
     expect(result).to.equal('a');
 
   });
 
   it ('Will get a value', async function () {
 
-    let result = await kv.get('test');
+    let result = await kv.store().get('test');
     expect(result).to.equal('a');
 
   });
 
   it ('Will clear value via `set` with null', async function () {
 
-    let result = await kv.set('test', null);
+    let result = await kv.store().set('test', null);
     expect(result).to.equal(null);
     
-    let result2 = await kv.get('test');
+    let result2 = await kv.store().get('test');
     expect(result2).to.equal(null);
 
-    let result3 = await kv.getRaw('test');
+    let result3 = await kv.store().getRaw('test');
     expect(result3).to.equal(null);
 
   });
 
   it ('Will clear value via `clear`', async function () {
 
-    await kv.set('test', 'alpha');
-    let prefill = await kv.get('test');
+    await kv.store().set('test', 'alpha');
+    let prefill = await kv.store().get('test');
     expect(prefill).to.equal('alpha');
 
-    let result = await kv.set('test', null);
+    let result = await kv.store().set('test', null);
     expect(result).to.equal(null);
     
-    let result2 = await kv.get('test');
+    let result2 = await kv.store().get('test');
     expect(result2).to.equal(null);
 
-    let result3 = await kv.getRaw('test');
+    let result3 = await kv.store().getRaw('test');
     expect(result3).to.equal(null);
 
   });
 
   it ('Will get a default value if no value is set', async function () {
 
-    let result = await kv.get('test2', 'a');
+    let result = await kv.store().get('test2', 'a');
     expect(result).to.equal('a');
 
   });
 
   it ('Will set a Raw value', async function () {
 
-    let result = await kv.setRaw('test', 'a');
+    let result = await kv.store().setRaw('test', 'a');
     expect(result).to.equal('a');
 
   });
 
   it ('Will get a Raw value', async function () {
 
-    let result = await kv.getRaw('test');
+    let result = await kv.store().getRaw('test');
     expect(result).to.equal('a');
 
   });
@@ -88,7 +122,7 @@ export default async function (setupResult) {
     let error;
 
     try {
-      await kv.get('test');
+      await kv.store().get('test');
     } catch (e) {
       error = e;
     }
@@ -100,8 +134,8 @@ export default async function (setupResult) {
 
   it ('Will get a raw value that was set with JSON', async function () {
 
-    await kv.set('test', [1, 2]);
-    let result = await kv.getRaw('test');
+    await kv.store().set('test', [1, 2]);
+    let result = await kv.store().getRaw('test');
     expect(result).to.equal('[1,2]');
 
   });
@@ -111,7 +145,7 @@ export default async function (setupResult) {
     let error;
 
     try {
-      await kv.setBuffer('file', 'abc');
+      await kv.store().setBuffer('file', 'abc');
     } catch (e) {
       error = e;
     }
@@ -123,7 +157,7 @@ export default async function (setupResult) {
 
   it ('Will set a Buffer value', async function () {
 
-    let result = await kv.setBuffer('file', Buffer.from('abc'));
+    let result = await kv.store().setBuffer('file', Buffer.from('abc'));
     expect(result).to.exist;
     expect(Buffer.isBuffer(result)).to.equal(true);
     expect(result.toString()).to.equal('abc');
@@ -132,16 +166,25 @@ export default async function (setupResult) {
 
   it ('Will get a Buffer value', async function () {
 
-    let result = await kv.getBuffer('file');
+    let result = await kv.store().getBuffer('file');
     expect(result).to.exist;
     expect(Buffer.isBuffer(result)).to.equal(true);
     expect(result.toString()).to.equal('abc');
 
   });
 
+  it ('Will connect to another host', async function () {
+
+    let cfg = kv.Config.read('test', 'main');
+    await kv.addStore('hello', cfg);
+
+    expect(kv.store('hello')).to.exist;
+
+  });
+
   after(async function () {
 
-    await kv.close();
+    await kv.disconnect();
 
   });
 

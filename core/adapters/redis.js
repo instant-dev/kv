@@ -111,15 +111,25 @@ class RedisAdapter extends KVAdapter {
   }
 
   async set (key, value) {
-    let result = await this.command('SET', key, value);
-    if (result !== 'OK') {
-      throw new Error(`Invalid key-value response for "SET": ${result}`);
+    if (value === null) {
+      await this.clear(key);
+      return value;
+    } else {
+      let result = await this.command('SET', key, JSON.stringify(value));
+      if (result !== 'OK') {
+        throw new Error(`Invalid key-value response for "SET": ${result}`);
+      }
+      return value;
     }
-    return value;
   }
 
   async get (key, defaultValue = null) {
     let value = await this.command('GET', key);
+    try {
+      value = JSON.parse(value);
+    } catch (e) {
+      throw new Error(`Invalid key-value response: Invalid JSON`);
+    }
     return value === null ? defaultValue : value;
   }
 
@@ -130,37 +140,45 @@ class RedisAdapter extends KVAdapter {
     return this.command('DEL', ...keys);
   }
 
-  async setBuffer (key, value) {
-    if (!Buffer.isBuffer(value)) {
-      throw new Error(`setBuffer requires a valid Buffer`);
+  async setRaw (key, value) {
+    if (value === null) {
+      await this.clear(key);
+      return value;
+    } else {
+      let result = await this.command('SET', key, value);
+      if (result !== 'OK') {
+        throw new Error(`Invalid key-value response for "SET": ${result}`);
+      }
+      return value;
     }
-    let result = await this.command('SET', key, value);
-    if (result !== 'OK') {
-      throw new Error(`Invalid key-value response for "SET": ${result}`);
-    }
-    return value;
   }
 
-  async getBuffer (key, defaultValue = null) {
-    let value = await this.command({returnBuffers: true}, 'GET', key);
+  async getRaw (key, defaultValue = null) {
+    let value = await this.command('GET', key);
     return value === null ? defaultValue : value;
   }
 
-  async setJSON (key, value) {
-    let result = await this.command('SET', key, JSON.stringify(value));
-    if (result !== 'OK') {
-      throw new Error(`Invalid key-value response for "SET": ${result}`);
+  async setBuffer (key, value) {
+    if (value === null) {
+      await this.clear(key);
+      return value;
+    } else {
+      if (!Buffer.isBuffer(value)) {
+        throw new Error(`setBuffer requires a valid Buffer`);
+      }
+      let result = await this.command('SET', key, value);
+      if (result !== 'OK') {
+        throw new Error(`Invalid key-value response for "SET": ${result}`);
+      }
+      return value;
     }
-    return value;
   }
 
-  async getJSON (key, defaultValue = null) {
-    let value = await this.command('GET', key);
-    try {
-      value = JSON.parse(value);
-    } catch (e) {
-      throw new Error(`Invalid key-value response: Invalid JSON`);
+  async getBuffer (key, defaultValue = null) {
+    if (defaultValue !== null && !Buffer.isBuffer(defaultValue)) {
+      throw new Error(`getBuffer requires a valid Buffer for defaultValue`);
     }
+    let value = await this.command({returnBuffers: true}, 'GET', key);
     return value === null ? defaultValue : value;
   }
 

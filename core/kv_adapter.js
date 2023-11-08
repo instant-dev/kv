@@ -128,6 +128,7 @@ class KVAdapter {
       user: 'default',
       password: '',
       port: 6379,
+      ssl: false,
       in_vpc: false,
       tunnel: null
     };
@@ -136,13 +137,14 @@ class KVAdapter {
   parseConnectionString (connectionString, cfg = null) {
     const defaultConfig = this.createDefaultConfig();
     cfg = cfg || defaultConfig;
-    const match = connectionString.match(/^redis:\/\/(?:([A-Za-z0-9_]+)(?:\:([A-Za-z0-9_\-]+))?@)?([A-Za-z0-9_\.\-]+):(\d+)(?:\/([A-Za-z0-9_]+)?)?$/);
+    const match = connectionString.match(/^redis(s)?:\/\/(?:([A-Za-z0-9_]+)(?:\:([A-Za-z0-9_\-]+))?@)?([A-Za-z0-9_\.\-]+):(\d+)(?:\/([A-Za-z0-9_]+)?)?$/);
     if (match) {
-      cfg.user = match[1] || cfg.user || defaultConfig.user;
-      cfg.password = match[2] || cfg.password || defaultConfig.password;
-      cfg.host = match[3] || cfg.host || defaultConfig.host;
-      cfg.port = match[4] || cfg.port || defaultConfig.port;
-      cfg.database = match[5] || cfg.database || defaultConfig.database;
+      cfg.user = match[2] || cfg.user || defaultConfig.user;
+      cfg.password = match[3] || cfg.password || defaultConfig.password;
+      cfg.host = match[4] || cfg.host || defaultConfig.host;
+      cfg.port = match[5] || cfg.port || defaultConfig.port;
+      cfg.database = match[6] || cfg.database || defaultConfig.database;
+      cfg.ssl = !!match[1];
     }
     return cfg;
   }

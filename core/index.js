@@ -52,7 +52,9 @@ class InstantKV {
     if (this._stores[name]) {
       throw new Error(`Already connected to store "${name}", use ".addStore()" to connect to another`);
     }
-    if (typeof cfg === 'string') {
+    if (!cfg) {
+      cfg = this.Config.read(this.Config.getProcessEnv(), name);
+    } else if (typeof cfg === 'string') {
       cfg = {connectionString: cfg};
     }
     const Adapter = (

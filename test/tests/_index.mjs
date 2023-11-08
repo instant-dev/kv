@@ -2,6 +2,7 @@ import chai from 'chai';
 const expect = chai.expect;
 
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 dotenv.config({path: '.env.test'});
 
@@ -12,6 +13,13 @@ export default async function (setupResult) {
 
   const cfg = {connectionString: 'redis://localhost:6379'};
   const kv = new InstantKV();
+
+  it ('Makes sure no _instant/kv.json exists', async function () {
+
+    fs.unlinkSync('./_instant/kv.json');
+    expect(fs.existsSync('./_instant/kv.json')).to.equal(false);
+
+  });
 
   it ('Writes and reads config to _instant/kv.json', async function () {
 
@@ -42,7 +50,19 @@ export default async function (setupResult) {
 
   });
 
-  it ('See if kv will connect', async function () {
+  it ('Connects to database from test credentials if no cfg provided', async function () {
+
+    await kv.connect();
+    expect(kv).to.exist;
+    expect(kv.store()).to.exist;
+    expect(kv.store('main')).to.exist;
+    expect(kv.store('main')).to.equal(kv.store());
+
+  });
+
+  it ('Will disconnect and then reconnect using manual credentials', async function () {
+
+    await kv.disconnect();
 
     await kv.connect(cfg);
     expect(kv).to.exist;

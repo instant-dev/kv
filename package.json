@@ -1,6 +1,6 @@
 {
   "name": "@instant.dev/kv",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Key-value library for managing Redis connections",
   "main": "index.js",
   "scripts": {

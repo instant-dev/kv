@@ -73,9 +73,10 @@ class KVAdapter {
     const tunnelObject = {
       tunnel: tnl,
       port: localPort,
-      close: () => {
+      close: async () => {
+        await tnl.close();
+        await new Promise(res => setTimeout(() => res(true), 1000)); // hack: race condition
         delete OPEN_TUNNELS_BY_PORT[localPort];
-        tnl.close();
       }
     };
     OPEN_TUNNELS_BY_PORT[localPort] = tnl;

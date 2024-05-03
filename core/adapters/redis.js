@@ -66,7 +66,7 @@ class RedisAdapter extends KVAdapter {
       await new Promise(async (resolve, reject) => {
         const connectErrorHandler = async err => {
           this._client.removeListener('error', connectErrorHandler);
-          await this._client.disconnect();
+          await this.close();
           reject(err);
         };
         this._client.on('error', connectErrorHandler);

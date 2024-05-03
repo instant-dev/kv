@@ -34,6 +34,7 @@ class KVAdapter {
     this.log(`Via:  "${sshUser}@${sshHost}:${sshPort}"`);
     this.log(`To:   "${host}:${port}"`);
     while (!tnl) {
+      this.log(`Port: "${localPort}" (Attempt)`);
       try {
         let [server, conn] = await createTunnel(
           {

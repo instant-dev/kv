@@ -34,51 +34,77 @@ class RedisAdapter extends KVAdapter {
   }
 
   async close () {
-    this._client && this._client.end();
-    this._tunnel && this._tunnel.close();
+    try {
+      this._client && (await this._client.disconnect());
+    } catch (e) {
+      // do nothing, already closed
+    }
+    try {
+      this._tunnel && this._tunnel.close();
+    } catch (e) {
+      // do nothing, already closed
+    }
     this._tunnel = null;
     this._client = null;
-    this.log('Closed');
+    this.log('Redis connection closed');
   }
 
   async connect (connectTimeout) {
+    const timeout = connectTimeout || DEFAULT_CONNECT_TIMEOUT;
+    let initialized = false;
     let cfg = this._config;
+    let url;
     if (cfg.tunnel) {
       let result = await this.connectToTunnel(cfg);
       cfg = result.config;
       this._tunnel = result.tunnelObject;
+      url = `redis${cfg.ssl ? 's' : ''}://${cfg.user}:${cfg.password}@localhost:${cfg.port}/${cfg.database}`;
+    } else {
+      url = `redis${this._config.ssl ? 's' : ''}://${this._config.user}:${this._config.password}@${this._config.host}:${this._config.port}/${this._config.database}`;
     }
     this.log(`Connecting to ${this.name}${this._config.database ? ` database "${this._config.database}"` : ``} as role "${this._config.user}" on ${this._config.host}:${this._config.port} ...`);
-    const url = `redis${this._config.ssl ? 's' : ''}://${this._config.user}:${this._config.password}@${this._config.host}:${this._config.port}/${this._config.database}`;
+    this.log(` => via "${url}" ...`);
     this._client = createClient({
       url,
       socket: {
-        connectTimeout: connectTimeout || DEFAULT_CONNECT_TIMEOUT,
-        reconnectStrategy: (retries) => {
-          const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-          const delay = Math.min(10 + (retries * 500), maxDelay);
-          this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-          return delay;
-        }
+        connectTimeout: timeout,
+        // reconnectStrategy: (retries) => {
+        //     const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+        //     const delay = Math.min(retries * 500, maxDelay);
+        //     this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+        //     return delay;
+        //   }
+        // }
       }
     });
     try {
       await new Promise(async (resolve, reject) => {
-        const connectErrorHandler = async err => {
-          this._client.removeListener('error', connectErrorHandler);
+        this._client.on('error', (err) => {
+          console.error(err);
+          this.error(`Connection error: ${err.message}`)
+        });
+        this._client.on('reconnecting', () => this.log(`Reconnecting ...`));
+        try {
+          await Promise.race([
+            this._client.connect(),
+            new Promise((resolve, reject) => {
+              setTimeout(() => reject(new Error(`Connection timeout (initialization, ${timeout * 2}ms)`)), timeout * 2);
+            })
+          ]);
+          resolve(true);
+        } catch (err) {
           await this.close();
           reject(err);
-        };
-        this._client.on('error', connectErrorHandler);
-        let result = await this._client.connect();
-        resolve(result);
+        }
       });
     } catch (e) {
       if (e.errors) {
         e = e.errors[0];
       }
+      this.error(`Could not connect to Redis: ${e.message}`);
       throw new Error(`Could not connect to Redis: ${e.message}`);
     }
+    initialized = true;
     this.log(`Successfully connected to ${this.name}${this._config.database ? ` database "${this._config.database}"` : ``}!`);
     return true;
   }

@@ -1,5 +1,6 @@
 const { createTunnel } = require('tunnel-ssh');
 const fs = require('fs');
+const OPEN_TUNNELS_BY_PORT = {};
 
 class KVAdapter {
 

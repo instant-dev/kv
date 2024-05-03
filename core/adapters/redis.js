@@ -34,7 +34,7 @@ class RedisAdapter extends KVAdapter {
   }
 
   async close () {
-    this._client && (await this._client.disconnect());
+    this._client && this._client.end();
     this._tunnel && this._tunnel.close();
     this._tunnel = null;
     this._client = null;
@@ -54,9 +54,9 @@ class RedisAdapter extends KVAdapter {
       url,
       socket: {
         connectTimeout: connectTimeout || DEFAULT_CONNECT_TIMEOUT,
-        reconnectStrategy: (times) => {
+        reconnectStrategy: (retries) => {
           const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-          const delay = Math.min(times * 1000, maxDelay);
+          const delay = Math.min(10 + (retries * 500), maxDelay);
           this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
           return delay;
         }

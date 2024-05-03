@@ -1,4 +1,5 @@
 const { createTunnel } = require('tunnel-ssh');
+const fs = require('fs');
 
 class KVAdapter {
 

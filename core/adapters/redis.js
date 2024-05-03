@@ -34,8 +34,8 @@ class RedisAdapter extends KVAdapter {
   }
 
   async close () {
-    this._tunnel && (await this._tunnel.close());
     this._client && (await this._client.disconnect());
+    this._tunnel && (await this._tunnel.close());
     this._tunnel = null;
     this._client = null;
     this.log('Closed');

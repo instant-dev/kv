@@ -68,13 +68,12 @@ class RedisAdapter extends KVAdapter {
       url,
       socket: {
         connectTimeout: timeout,
-        // reconnectStrategy: (retries) => {
-        //     const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-        //     const delay = Math.min(retries * 500, maxDelay);
-        //     this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-        //     return delay;
-        //   }
-        // }
+        reconnectStrategy: (retries) => {
+          const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+          const delay = Math.min(retries * 500, maxDelay);
+          this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+          return delay;
+        }
       }
     });
     try {

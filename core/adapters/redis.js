@@ -1,5 +1,5 @@
 const colors = require('colors/safe');
-const { createClient, commandOptions } = require('redis');
+const { createCluster, createClient, commandOptions } = require('redis');
 
 const KVAdapter = require('../kv_adapter.js');
 
@@ -64,18 +64,35 @@ class RedisAdapter extends KVAdapter {
     }
     this.log(`Connecting to ${this.name}${this._config.database ? ` database "${this._config.database}"` : ``} as role "${this._config.user}" on ${this._config.host}:${this._config.port} ...`);
     this.log(` => via "${url}" ...`);
-    this._client = createClient({
-      url,
-      socket: {
-        connectTimeout: timeout,
-        reconnectStrategy: (retries) => {
-          const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-          const delay = Math.min(retries * 500, maxDelay);
-          this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-          return delay;
+    if (cfg.cluster) {
+      this.log(`Connecting to cluster ...`);
+      this._client = createCluster({
+        rootNodes: [{url}],
+        socket: {
+          connectTimeout: timeout,
+          reconnectStrategy: (retries) => {
+            const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+            const delay = Math.min(retries * 500, maxDelay);
+            this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+            return delay;
+          }
         }
-      }
-    });
+      });
+    } else {
+      this.log(`Connecting to server ...`);
+      this._client = createClient({
+        url,
+        socket: {
+          connectTimeout: timeout,
+          reconnectStrategy: (retries) => {
+            const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+            const delay = Math.min(retries * 500, maxDelay);
+            this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+            return delay;
+          }
+        }
+      });
+    }
     try {
       await new Promise(async (resolve, reject) => {
         this._client.on('error', (err) => {

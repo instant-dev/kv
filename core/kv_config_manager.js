@@ -197,6 +197,7 @@ class KVConfigManager {
     } else if ('connectionString' in cfg) {
       expectedKeys = {
         'connectionString': 1,
+        'cluster': 1,
         'in_vpc': 1,
         'tunnel': 1
       };
@@ -208,6 +209,7 @@ class KVConfigManager {
         'password': 1,
         'database': 1,
         'ssl': 1,
+        'cluster': 1,
         'in_vpc': 1,
         'tunnel': 1
       };
@@ -278,6 +280,11 @@ class KVConfigManager {
         } else {
           vcfg[key] = parseInt(value);
         }
+      } else if (key === 'cluster') {
+        if (value !== void 0 && typeof value !== 'boolean') {
+          throw new Error(`"cluster" must be true or false`);
+        }
+        vcfg[key] = value || false;
       } else if (key === 'in_vpc') {
         if (value !== void 0 && typeof value !== 'boolean') {
           throw new Error(`"in_vpc" must be true or false`);

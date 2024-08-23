@@ -132,6 +132,7 @@ class KVAdapter {
       password: '',
       port: 6379,
       ssl: false,
+      cluster: false,
       in_vpc: false,
       tunnel: null
     };

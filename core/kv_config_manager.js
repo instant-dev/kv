@@ -14,7 +14,7 @@ class KVConfigManager {
   }
 
   getProcessEnv () {
-    let env = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    let env = process.env._ORIGINAL_NODE_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
     return env;
   }
 

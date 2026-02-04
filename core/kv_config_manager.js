@@ -13,8 +13,13 @@ class KVConfigManager {
     return colors.bold.cyan(`${this.name}: `) + message;
   }
 
+  getOriginalProcessEnv () {
+    const env = process.env._ORIGINAL_NODE_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    return env;
+  }
+
   getProcessEnv () {
-    let env = process.env._ORIGINAL_NODE_ENV || process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
+    const env = process.env.VERCEL_ENV || process.env.NODE_ENV || 'development';
     return env;
   }
 
@@ -177,7 +182,7 @@ class KVConfigManager {
     const config = this.constructor.validate(parsedConfig);
     // if tunnel.in_vpc is true it means that when deployed,
     // the key-value environment should be in a vpc and not need a tunnel
-    const currentEnv = this.getProcessEnv();
+    const currentEnv = this.getOriginalProcessEnv();
     const isLiveEnvironment = (
       currentEnv === env &&
       currentEnv !== 'development'

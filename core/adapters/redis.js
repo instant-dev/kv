@@ -84,7 +84,7 @@ class RedisAdapter extends KVAdapter {
       // When connecting through an SSH tunnel, the cluster will advertise
       // internal node addresses (e.g. private VPC IPs) that are unreachable.
       // Remap all discovered node addresses back through the tunnel.
-      if (cfg.tunnel) {
+      if (this._tunnel) {
         clusterConfig.nodeAddressMap = (address) => ({
           host: 'localhost',
           port: cfg.port

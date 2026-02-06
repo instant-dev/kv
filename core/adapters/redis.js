@@ -64,35 +64,26 @@ class RedisAdapter extends KVAdapter {
     }
     this.log(`Connecting to ${this.name}${this._config.database ? ` database "${this._config.database}"` : ``} as role "${this._config.user}" on ${this._config.host}:${this._config.port} ...`);
     this.log(` => via "${url}" ...`);
-    if (cfg.cluster) {
+    if (cfg.cluster && !this._tunnel) {
       this.log(`Connecting to cluster ...`);
-      const socketConfig = {
-        connectTimeout: timeout,
-        reconnectStrategy: (retries) => {
-          const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-          const delay = Math.min(retries * 500, maxDelay);
-          this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-          return delay;
-        }
-      };
-      const clusterConfig = {
+      this._client = createCluster({
         rootNodes: [{url}],
         defaults: {
-          socket: socketConfig
+          socket: {
+            connectTimeout: timeout,
+            reconnectStrategy: (retries) => {
+              const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+              const delay = Math.min(retries * 500, maxDelay);
+              this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+              return delay;
+            }
+          }
         }
-      };
-      // When connecting through an SSH tunnel, the cluster will advertise
-      // internal node addresses (e.g. private VPC IPs) that are unreachable.
-      // Remap all discovered node addresses back through the tunnel.
-      if (this._tunnel) {
-        clusterConfig.nodeAddressMap = (address) => ({
-          host: 'localhost',
-          port: cfg.port
-        });
-        this.log(`Using nodeAddressMap to route cluster nodes through tunnel on localhost:${cfg.port}`);
-      }
-      this._client = createCluster(clusterConfig);
+      });
     } else {
+      if (cfg.cluster && this._tunnel) {
+        this.log(`Cluster mode is not supported through an SSH tunnel. Using single-client mode via tunnel instead.`);
+      }
       this.log(`Connecting to server ...`);
       this._client = createClient({
         url,

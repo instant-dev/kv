@@ -66,18 +66,32 @@ class RedisAdapter extends KVAdapter {
     this.log(` => via "${url}" ...`);
     if (cfg.cluster) {
       this.log(`Connecting to cluster ...`);
-      this._client = createCluster({
-        rootNodes: [{url}],
-        socket: {
-          connectTimeout: timeout,
-          reconnectStrategy: (retries) => {
-            const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-            const delay = Math.min(retries * 500, maxDelay);
-            this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-            return delay;
-          }
+      const socketConfig = {
+        connectTimeout: timeout,
+        reconnectStrategy: (retries) => {
+          const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+          const delay = Math.min(retries * 500, maxDelay);
+          this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+          return delay;
         }
-      });
+      };
+      const clusterConfig = {
+        rootNodes: [{url}],
+        defaults: {
+          socket: socketConfig
+        }
+      };
+      // When connecting through an SSH tunnel, the cluster will advertise
+      // internal node addresses (e.g. private VPC IPs) that are unreachable.
+      // Remap all discovered node addresses back through the tunnel.
+      if (cfg.tunnel) {
+        clusterConfig.nodeAddressMap = (address) => ({
+          host: 'localhost',
+          port: cfg.port
+        });
+        this.log(`Using nodeAddressMap to route cluster nodes through tunnel on localhost:${cfg.port}`);
+      }
+      this._client = createCluster(clusterConfig);
     } else {
       this.log(`Connecting to server ...`);
       this._client = createClient({

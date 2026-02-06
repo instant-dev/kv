@@ -16,6 +16,7 @@ class RedisAdapter extends KVAdapter {
     this.COMMAND_TIMEOUT = DEFAULT_COMMAND_TIMEOUT;
     this._config = cfg;
     this._tunnel = null;
+    this._shardTunnels = [];
     this._client = null;
   }
 
@@ -44,7 +45,13 @@ class RedisAdapter extends KVAdapter {
     } catch (e) {
       // do nothing, already closed
     }
+    if (this._shardTunnels) {
+      for (const tunnel of this._shardTunnels) {
+        try { tunnel.close(); } catch (e) { /* already closed */ }
+      }
+    }
     this._tunnel = null;
+    this._shardTunnels = [];
     this._client = null;
     this.log('Redis connection closed');
   }
@@ -64,38 +71,74 @@ class RedisAdapter extends KVAdapter {
     }
     this.log(`Connecting to ${this.name}${this._config.database ? ` database "${this._config.database}"` : ``} as role "${this._config.user}" on ${this._config.host}:${this._config.port} ...`);
     this.log(` => via "${url}" ...`);
-    if (cfg.cluster && !this._tunnel) {
-      this.log(`Connecting to cluster ...`);
-      this._client = createCluster({
-        rootNodes: [{url}],
-        defaults: {
-          socket: {
-            connectTimeout: timeout,
-            reconnectStrategy: (retries) => {
-              const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-              const delay = Math.min(retries * 500, maxDelay);
-              this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-              return delay;
+    const socketConfig = {
+      connectTimeout: timeout,
+      reconnectStrategy: (retries) => {
+        const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
+        const delay = Math.min(retries * 500, maxDelay);
+        this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
+        return delay;
+      }
+    };
+    if (cfg.cluster) {
+      let nodeAddressMap;
+      if (this._tunnel) {
+        // Cluster through SSH tunnel: discover topology and create per-shard tunnels
+        this.log(`Discovering cluster topology through tunnel ...`);
+        const tempClient = createClient({url, socket: {connectTimeout: timeout}});
+        try {
+          await tempClient.connect();
+          const slots = await tempClient.sendCommand(['CLUSTER', 'SLOTS']);
+          await tempClient.disconnect();
+          // Extract unique master shard addresses from CLUSTER SLOTS response
+          // Format: [[startSlot, endSlot, [host, port, nodeId], ...], ...]
+          const shardAddresses = new Map();
+          for (const slot of slots) {
+            const host = String(slot[2][0]);
+            const port = Number(slot[2][1]);
+            const addr = `${host}:${port}`;
+            if (!shardAddresses.has(addr)) {
+              shardAddresses.set(addr, {host, port});
             }
           }
+          this.log(`Discovered ${shardAddresses.size} cluster shard(s). Creating per-shard tunnels ...`);
+          // Create a dedicated SSH tunnel for each shard node
+          const tunnelCfg = this._config.tunnel;
+          nodeAddressMap = {};
+          for (const [addr, {host, port}] of shardAddresses) {
+            const shardTunnel = await this.createTunnel(
+              host,
+              port,
+              tunnelCfg.private_key,
+              tunnelCfg.user,
+              tunnelCfg.host,
+              tunnelCfg.port
+            );
+            this._shardTunnels.push(shardTunnel);
+            nodeAddressMap[addr] = {host: '127.0.0.1', port: shardTunnel.port};
+            this.log(`  Shard ${addr} => localhost:${shardTunnel.port}`);
+          }
+        } catch (e) {
+          try { await tempClient.disconnect(); } catch (_) {}
+          throw e;
         }
-      });
-    } else {
-      if (cfg.cluster && this._tunnel) {
-        this.log(`Cluster mode is not supported through an SSH tunnel. Using single-client mode via tunnel instead.`);
       }
+      this.log(`Connecting to cluster ...`);
+      const clusterConfig = {
+        rootNodes: [{url}],
+        defaults: {
+          socket: socketConfig
+        }
+      };
+      if (nodeAddressMap) {
+        clusterConfig.nodeAddressMap = nodeAddressMap;
+      }
+      this._client = createCluster(clusterConfig);
+    } else {
       this.log(`Connecting to server ...`);
       this._client = createClient({
         url,
-        socket: {
-          connectTimeout: timeout,
-          reconnectStrategy: (retries) => {
-            const maxDelay = 5000; // Maximum delay between reconnection attempts (in milliseconds)
-            const delay = Math.min(retries * 500, maxDelay);
-            this.error(`Redis connection lost. Reconnecting in ${delay} ms...`);
-            return delay;
-          }
-        }
+        socket: socketConfig
       });
     }
     try {

@@ -38,7 +38,7 @@ class KVAdapter {
       try {
         let [server, conn] = await createTunnel(
           {
-            autoClose: true
+            autoClose: false
           },
           {
             port: localPort
